@@ -1,0 +1,23 @@
+Stückliste exportiert aus AudioStream_v2.sch am 13.01.2017 14:39
+
+Qty Value              Device             Package               Parts                                    
+2   0R                 R-EU_R0805         R0805                 R14, R15                                 
+6   10k                R-EU_R0603         R0603                 R1, R5, R6, R7, R9, R12                  
+3   1k                 R-EU_R0603         R0603                 R2, R8, R13                              
+2   470                R-EU_R0603         R0603                 R10, R11                                 
+2   7.25k              R-EU_R0603         R0603                 R3, R4                                   
+9   10uF               C-EUC3216          C3216                 C2, C3, C7, C9, C10, C11, C14, C24, C25,               
+9   100nF              C-EUC0805          C0805                 C1, C5, C6, C13, C17, C20, C21, C26, C27 
+4   1uF                C-EUC0805          C0805                 C18, C19, C22, C23                       
+2   2.2u               C-EUC0805          C0805                 C8, C12                                  
+1   100nF              C-EUC0603          C0603                 C4                                       
+2   2.2nF              C-EUC0603          C0603                 C15, C16                                 
+1   ESP12-E            ESP12ESMD          ESP12E-SMD            U1                                       
+1   LM2937IMP-3.3      LM2937IMP-X.X      SOT223                U2                                       
+1   PCM5141            PCM5141            PW_R-PDSO-G28         U4                                       
+1   TPA2012D2          TPA2012D2          QFN50P400X400X100-21N U3                                       
+2   green              LEDCHIPLED_0805    CHIPLED_0805          LED1, LED2                               
+1   audio              MA03-1             MA03-1                SV1, SV4                                      
+1   speaker            MA04-1             MA04-1                SV3                                      
+1   ISP                FE05-1             FE05-1                SV2                                      
+1   PWR                JP1E               JP1                   SV5                                      

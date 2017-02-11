@@ -50,7 +50,7 @@
 #define configMAX_PRIORITIES		( ( unsigned portBASE_TYPE ) 15 )
 #endif
 #ifndef configMINIMAL_STACK_SIZE
-#define configMINIMAL_STACK_SIZE	( ( unsigned short )256 )
+#define configMINIMAL_STACK_SIZE	( ( unsigned short )128 )
 #endif
 #ifndef configTOTAL_HEAP_SIZE
 #define configTOTAL_HEAP_SIZE		( ( size_t ) ( 32 * 1024 ) )

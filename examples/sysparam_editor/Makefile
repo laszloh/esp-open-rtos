@@ -3,6 +3,8 @@ PROGRAM=sysparam_editor
 # Setting this to 1..3 will add extra debugging output to stdout
 EXTRA_CFLAGS=-DSYSPARAM_DEBUG=0
 
+ESPBAUD=57600
+
 include ../../common.mk
 
 # `make dump-flash` can be used to view the current contents of the sysparam
