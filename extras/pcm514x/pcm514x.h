@@ -40,10 +40,10 @@ typedef struct{
 			int8_t agns;		///< Analog gain selector: 0-dB 2-V RMS output (Low), 6-dB 1-V RMS output (High)
 			int8_t flt;			///< Filter select: Normal latency (Low) / Low latency (High)
 		} hw;
-#if PCM514X_SPI_SUPPORT
+#if (PCM514X_SPI_SUPPORT)
 		uint8_t cs;				///< SW chip select pin on the esp
 #endif
-#if PCM514X_I2C_SUPPORT
+#if (CM514X_I2C_SUPPORT)
 		uint8_t addr;			///< I2C address of the pcm514x
 #endif
 	};
@@ -53,6 +53,9 @@ typedef struct{
 		int8_t pll_in;			///< GPIO pin on the pcm for the PLL
 		int8_t pll_out;			///< GPIO pin on the pcm for the output of the pll (into sclk)
 	} clk;
+#if (PCM514X_MUTEX_SUPPORT)
+	SemaphoreHandle_t ifMutex;
+#endif
 } pcm514x_t;
 
 typedef enum {

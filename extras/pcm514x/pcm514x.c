@@ -10,6 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if (PCM514X_MUTEX_SUPPORT)
+#include "FreeRTOS.h"
+#include "semphr.h"
+#endif
+
 #include "pcm514x.h"
 #include "pcm514x_regs.h"
 #include <stdio.h>
@@ -18,17 +23,13 @@
 #include <esp/iomux_regs.h>
 
 #if PCM514X_I2C_SUPPORT
-
 #include <i2c/i2c.h>
 #define I2C_ADDR(a)	(0x98 | (a & 0x07))
-
 #endif
 
 #if PCM514X_SPI_SUPPORT
-
 #include <esp/spi.h>
 #define SPI_BUS 1
-
 #endif
 
 
@@ -55,7 +56,7 @@
 #endif
 
 static void write(const pcm514x_t* dev, uint8_t reg, uint8_t val);
-static uint8_t read(const pcm514x_t* dev, uint8_t reg);
+static uint8_t read(const pcm514x_t* dev, uint8_t reg, int* err);
 
 static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t val);
 static int read_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t shift, uint8_t *val);
@@ -63,6 +64,13 @@ static int read_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t sh
 pcm514x_error_t pcm514x_init(const pcm514x_t* dev)
 {
 	int ret;
+	
+#if (PCM514X_MUTEX_SUPPORT)
+	if(ifMutex == NULL) {
+		debug(1, "No mutex supplied for interface synchronization!");
+		return PCM514x_ERR_HWCFG_UNSUPPORTED;
+	}
+#endif
 
 	// setup the communication interface
 	switch(dev->mode) {
@@ -342,21 +350,26 @@ static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t v
 static int read_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t shift, uint8_t *val)
 {
 	uint8_t value;
+	int err;
 
 	// change to the needed page
 	write(dev, PCM514x_PAGE_REG, PCM514x_PAGE(reg));
 
 	// read the current register value
-	value = read(dev, reg);
+	value = read(dev, reg, &err);
 	value = (value & mask) >> shift;
 	*val = value;
-	return PCM514x_ERR_OK;
+	return err;
 }
 
 
 static void write(const pcm514x_t* dev, uint8_t reg, uint8_t val)
 {
 	debug(3, "write: reg: 0x%02x val: 0x%02x", reg, val);
+
+#if (PCM514X_MUTEX_SUPPORT)
+	xSemaphoreTake(ifMutex, portMAX_DELAY);
+#endif
 
 	switch(dev->mode) {
 #if PCM514X_SPI_SUPPORT
@@ -397,13 +410,23 @@ static void write(const pcm514x_t* dev, uint8_t reg, uint8_t val)
 		debug(1, "Unknown or unsupported mode: %d", dev->mode);
 		break;
 	}
+	
+#if (PCM514X_MUTEX_SUPPORT)
+	xSemaphoreGive(ifMutex);
+#endif
 }
 
-static uint8_t read(const pcm514x_t* dev, uint8_t reg)
+static uint8_t read(const pcm514x_t* dev, uint8_t reg, int *err)
 {
 	uint8_t val = 0;
+	int error = PCM514x_ERR_OK;
 
 	debug(3, "read: reg: 0x%02x val: 0x%02x", reg, val);
+	
+#if (PCM514X_MUTEX_SUPPORT)
+	xSemaphoreTake(ifMutex, portMAX_DELAY);
+#endif
+	
 	switch(dev->mode) {
 #if PCM514X_SPI_SUPPORT
 	case HWCFG_SPI:
@@ -420,18 +443,21 @@ static uint8_t read(const pcm514x_t* dev, uint8_t reg)
 		if(!i2c_write(cmd_write(I2C_ADDR(dev->addr)))) {
 			debug(1, "Error while transmitting salve address!");
 			i2c_stop();
-			return 0;
+			error = PCM514x_ERR_IOERROR;
+			break;
 		}
 		if(!i2c_write(reg)) {
 			debug(1, "Error while transmitting register address!");
 			i2c_stop();
-			return 0;
+			error = PCM514x_ERR_IOERROR;
+			break;
 		}
 		i2c_start();
 		if(!i2c_write(cmd_read(I2C_ADDR(dev->addr)))) {
 			debug(1, "Error while transmitting salve address after restart!");
 			i2c_stop();
-			return 0;
+			error = PCM514x_ERR_IOERROR;
+			break;
 		}
 		val = i2c_read(true);
 		i2c_stop();
@@ -446,6 +472,12 @@ static uint8_t read(const pcm514x_t* dev, uint8_t reg)
 		break;
 	}
 
+#if (PCM514X_MUTEX_SUPPORT)
+	xSemaphoreGive(ifMutex);
+#endif
+
+	if(err)
+		*err = error;
 	return val;
 }
 

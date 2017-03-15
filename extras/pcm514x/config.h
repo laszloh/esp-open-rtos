@@ -16,4 +16,8 @@
 #define PCM514X_SPI_SUPPORT 1
 #endif
 
+#ifndef PCM514X_MUTEX_SUPPORT
+#define PCM514X_MUTEX_SUPPORT 0
+#endif
+
 #endif /* EXTRAS_PCM514X_CONFIG_H_ */
