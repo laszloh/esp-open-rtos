@@ -200,14 +200,35 @@ void play_task(void *pvParameters)
     close(fd);
 }
 
+void pulser_task(void *pvParameters)
+{
+	uint8_t volume = 0;
+	int8_t inc = 1;
+	
+	
+	while(1) {
+		pcm514x_set_volume(&dev, volume);
+		
+		if(volume = 0xFF)
+			inc = -1;
+		else if(volume == 0x00)
+			inc = 1;
+		volume += inc;
+		
+		vTaskDelay(25 / portTICK_PERIOD_MS);
+	}
+}
+
 void user_init(void)
 {
     uart_set_baud(0, 115200);
 	
 	if(pcm514x_init(&dev) == PCM514x_ERR_OK) {
-		pcm514x_set_volume(&dev, 128);
+		pcm514x_set_volume(&dev, 0xCF);
 		pcm514x_set_standby(&dev, false);
 		pcm514x_set_audio_dpath(&dev, DPATH_RIGHT, DPATH_LEFT);
+		
+		xTaskCreate(pulser_task, "pulser_task", 512, NULL, 1, NULL)
 	}
 
     xTaskCreate(play_task, "test_task", 1024, NULL, 2, NULL);
