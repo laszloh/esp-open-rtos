@@ -53,6 +53,7 @@ typedef struct{
 		int8_t pll_in;			///< GPIO pin on the pcm for the PLL
 		int8_t pll_out;			///< GPIO pin on the pcm for the output of the pll (into sclk)
 	} clk;
+	bool deemphasis;			///< Enable the 44.1 KHz de-emphasis module
 } pcm514x_t;
 
 typedef enum {
@@ -110,6 +111,26 @@ typedef enum {
 	VOL_RAMP_MAX
 } pcm514x_rampsrc_t;
 
+typedef enum {
+	GPIO_OFF = 0,
+	GPIO_DSP_OUT,
+	GPIO_REG,
+	GPIO_FLAG_AMUTE,
+	GPIO_FLAG_AMUTE_L,
+	GPIO_FLAG_AMUTE_R,
+	GPIO_CLK_INV,
+	GPIO_SDOUT,
+	GPIO_AMUTE_L,
+	GPIO_AMUTE_R,
+	GPIO_FLAG_PLL_LOCK,
+	GPIO_FLAG_CHRG_PUMP,
+	GPIO_RES1,
+	GPIO_RES2,
+	GPIO_FLAG_UV_07V,
+	GPIO_FLAG_UV_03V,
+	GPIO_PLL_DIV_OUT
+} pcm514x_gpio_t;
+
 pcm514x_error_t pcm514x_init(const pcm514x_t* dev);
 
 pcm514x_error_t pcm514x_set_standby(const pcm514x_t* dev, bool enable);
@@ -126,6 +147,13 @@ pcm514x_error_t pcm514x_get_audio_amute(const pcm514x_t* dev, pcm514x_audio_amut
 
 pcm514x_error_t pcm514x_set_audio_dpath(const pcm514x_t* dev, pcm514x_audi_dpath_t dpath_r, pcm514x_audi_dpath_t dpath_l);
 pcm514x_error_t pcm514x_get_audio_dpath(const pcm514x_t* dev, pcm514x_audi_dpath_t *dpath_r, pcm514x_audi_dpath_t *dpath_l);
+
+// gpio submodule
+
+pcm514x_error_t pcm514x_gpio_enable(const pcm514x_t* dev, uint8_t gpio, bool output, bool invert);
+pcm514x_error_t pcm514x_gpio_set_mode(const pcm514x_t* dev, uint8_t gpio, pcm514x_gpio_t mode);
+
+pcm514x_error_t pcm514x_gpio_write(const pcm514x_t* dev, uint8_t gpio, bool output);
 
 #ifdef __cplusplus
 extern "C"

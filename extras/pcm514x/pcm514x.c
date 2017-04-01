@@ -13,9 +13,7 @@
 #include "pcm514x.h"
 #include "pcm514x_regs.h"
 #include <stdio.h>
-
 #include <esp/gpio.h>
-#include <esp/iomux_regs.h>
 
 #if PCM514X_I2C_SUPPORT
 
@@ -36,7 +34,7 @@
 #define CMD_BIT		0x01
 
 #define cmd_read(r)		(((r)<<CMD_SHIFT) | CMD_BIT)
-#define cmd_write(r)	(((r)<<CMD_SHIFT) | ~(CMD_BIT))
+#define cmd_write(r)	((r)<<CMD_SHIFT)
 
 // debug levels
 //   0..none
@@ -45,7 +43,7 @@
 //   3..debug
 
 #ifndef PCM514X_DEBUG
-#define PCM514X_DEBUG 0
+#define PCM514X_DEBUG 4
 #endif
 
 #if PCM514X_DEBUG >= 1
@@ -57,21 +55,24 @@
 static void write(const pcm514x_t* dev, uint8_t reg, uint8_t val);
 static uint8_t read(const pcm514x_t* dev, uint8_t reg);
 
-static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t val);
+static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t val, bool verify);
 static int read_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t shift, uint8_t *val);
 
 pcm514x_error_t pcm514x_init(const pcm514x_t* dev)
 {
 	int ret;
 
+	debug(3, "Setup mode 0x%02x", dev->mode);
+
 	// setup the communication interface
 	switch(dev->mode) {
 #if (PCM514X_SPI_SUPPORT)
 	case HWCFG_SPI:
+		debug(3, "Setup SPI bus %d, CS: 0x%02x", SPI_BUS, dev->cs);
 		// set up the interface
 		gpio_enable(dev->cs, GPIO_OUTPUT);
 		gpio_write(dev->cs, true);
-		spi_init(SPI_BUS, SPI_MODE0, SPI_FREQ_DIV_8M, true, SPI_LITTLE_ENDIAN, true);
+		spi_init(SPI_BUS, SPI_MODE1, SPI_FREQ_DIV_500K, true, SPI_LITTLE_ENDIAN, true);
 		break;
 #endif
 
@@ -103,8 +104,7 @@ pcm514x_error_t pcm514x_init(const pcm514x_t* dev)
 	}
 
 	// reset the PCM514x
-	ret = write_register(dev, PCM514x_RESET, (PCM514x_RSTR | PCM514x_RSTM),
-			(PCM514x_RSTR | PCM514x_RSTM));
+	ret = write_register(dev, PCM514x_RESET, (PCM514x_RSTR | PCM514x_RSTM), (PCM514x_RSTR | PCM514x_RSTM), false);
 	if(ret != PCM514x_ERR_OK)
 		return ret;
 
@@ -113,30 +113,37 @@ pcm514x_error_t pcm514x_init(const pcm514x_t* dev)
 		// clk out from the esp is currently not supported
 		debug(1, "SCK generation through PLL and external clock is not implemented!");
 		return PCM514x_ERR_HWCFG_UNSUPPORTED;
-
 	} else {
 		// setup BCLK as clk source
 
 		// ignore clk error
 		ret = write_register(dev, PCM514x_ERROR_DETECT,
-				PCM514x_IDCH, PCM514x_IDCH);
+				PCM514x_IDCH, PCM514x_IDCH, true);
 		if(ret != PCM514x_ERR_OK) {
 			debug(1, "Failed to set ignore bits in register PCM514x_ERROR_DETECT: %d", ret);
 			return ret;
 		}
 
 		// set the PLL to the BCLK
-		ret = write_register(dev, PCM514x_PLL_REF,
-				PCM514x_SREF, PCM514x_SREF);
+		ret = write_register(dev, PCM514x_PLL_REF, PCM514x_SREF, PCM514x_SREF_BCK, true);
 		if(ret != PCM514x_ERR_OK) {
 			debug(1, "Failed to switch PLL to BCLK: %d", ret);
 			return ret;
 		}
 	}
 
+	if(dev->deemphasis) {
+		// enable de-emphasis
+		ret = write_register(dev, PCM514x_DSP, PCM514x_DEMP, PCM514x_DEMP, true);
+		if(ret != PCM514x_ERR_OK) {
+			debug(1, "Failed to enable 44.1kHz de-emphasis: %d", ret);
+			return ret;
+		}
+	}
+
 	// default to standby mode
 	ret = write_register(dev,  PCM514x_POWER,
-			PCM514x_RQST, PCM514x_RQST);
+			PCM514x_RQST, PCM514x_RQST, true);
 	if(ret != PCM514x_ERR_OK) {
 		debug(1, "Failed to request standby: %d", ret);
 		return ret;
@@ -151,7 +158,7 @@ pcm514x_error_t pcm514x_set_standby(const pcm514x_t* dev, bool enable)
 	int ret;
 
 	// change the state of the device
-	ret = write_register(dev, PCM514x_POWER, PCM514x_RQST, value);
+	ret = write_register(dev, PCM514x_POWER, PCM514x_RQST, value, true);
 	if(ret != PCM514x_ERR_OK) {
 		debug(1, "Failed to set standby to %d: %d", enable, ret);
 		return ret;
@@ -180,12 +187,12 @@ pcm514x_error_t pcm514x_set_volume(const pcm514x_t* dev, uint8_t vol)
 	int ret;
 
 	// write the right channel (remember, 0x00 = +24 dB, 0xFF =-102 dB)
-	ret = write_register(dev, PCM514x_DIGITAL_VOLUME_2, 0xFF, ~vol);
+	ret = write_register(dev, PCM514x_DIGITAL_VOLUME_2, 0xFF, ~vol, true);
 	if(ret != PCM514x_ERR_OK){
 		debug(1, "Failed to set left channel volume: %d", ret);
 		return ret;
 	}
-	return write_register(dev, PCM514x_DIGITAL_VOLUME_3, 0xFF, ~vol);
+	return write_register(dev, PCM514x_DIGITAL_VOLUME_3, 0xFF, ~vol, true);
 	if(ret != PCM514x_ERR_OK){
 		debug(1, "Failed to set right channel volume: %d", ret);
 		return ret;
@@ -233,7 +240,7 @@ pcm514x_error_t pcm514x_set_volume_ramp(const pcm514x_t* dev, pcm514x_rampsrc_t 
 		return PCM514x_ERR_OOB;
 	}
 
-	ret = write_register(dev, reg, mask, val);
+	ret = write_register(dev, reg, mask, val, true);
 	if(ret != PCM514x_ERR_OK) {
 		debug(1, "failed to write ramp register %d: %d", reg, ret);
 	}
@@ -283,13 +290,13 @@ pcm514x_error_t pcm514x_set_audio_amute(const pcm514x_t* dev, pcm514x_audio_amut
 	// setup auto mute
 	val = ((amute_r.en_amute) ? 1 : 0)  << PCM514x_AMRE_SHIFT | ((amute_l.en_amute) ? 1 : 0) << PCM514x_AMLE_SHIFT |
 			((amute_r.en_amute == amute_l.en_amute) ? 1 : 0) << PCM514x_ACTL_SHIFT;
-	ret = write_register(dev, PCM514x_DIGITAL_MUTE_3, (PCM514x_ACTL | PCM514x_AMLE | PCM514x_AMRE), val);
+	ret = write_register(dev, PCM514x_DIGITAL_MUTE_3, (PCM514x_ACTL | PCM514x_AMLE | PCM514x_AMRE), val, true);
 	if(ret != PCM514x_ERR_OK) {
 		debug(1, "Failed to write register 0x%02x to 0x%02x: %d", PCM514x_DIGITAL_MUTE_3, val, ret);
 		return ret;
 	}
 	val = (amute_r.amute << PCM514x_ATMR_SHIFT) | (amute_l.amute << PCM514x_ATML_SHIFT);
-	ret = write_register(dev, PCM514x_AUTO_MUTE, (PCM514x_ATMR | PCM514x_ATML), val);
+	ret = write_register(dev, PCM514x_AUTO_MUTE, (PCM514x_ATMR | PCM514x_ATML), val, true);
 	if(ret != PCM514x_ERR_OK) {
 		debug(1, "Failed to write register 0x%02x to 0x%02x: %d", PCM514x_AUTO_MUTE, val, ret);
 		return ret;
@@ -309,31 +316,83 @@ pcm514x_error_t pcm514x_set_audio_dpath(const pcm514x_t* dev, pcm514x_audi_dpath
 
 	// set up data path routing
 	val = (dpath_r << PCM514x_AUPR_SHIFT) | (dpath_r << PCM514x_AUPL_SHIFT);
-	ret = write_register(dev, PCM514x_DAC_ROUTING, (PCM514x_AUPR | PCM514x_AUPL), val);
+	ret = write_register(dev, PCM514x_DAC_ROUTING, (PCM514x_AUPR | PCM514x_AUPL), val, true);
 	if(ret != PCM514x_ERR_OK) {
-		debug(1, "Failed to write register 0x%02x to 0x%02x: %d", PCM514x_DAC_ROUTING, val, ret);
+		debug(1, "Failed to set DAC routing path: %d", ret);
 		return ret;
 	}
 	return PCM514x_ERR_OK;
 }
 
-static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t val)
+pcm514x_error_t pcm514x_gpio_enable(const pcm514x_t* dev, uint8_t gpio, bool output, bool invert)
 {
-	uint8_t value;
+	int ret;
+
+	if(gpio > 5) {
+		debug(1, "Invalid gpio number %d given (max. 5).", gpio);
+		return PCM514x_ERR_OOB;
+	}
+
+	ret = write_register(dev, PCM514x_GPIO_EN, (1 << gpio), (output) ? 0xFF : 0x00, true);
+	if(ret != PCM514x_ERR_OK) {
+		debug(1, "Failed to set gpio pin: %d", ret);
+		return ret;
+	}
+
+	ret = write_register(dev, PCM514x_GPIO_CONTROL_2, (1 << gpio), (invert) ? 0xFF : 0x00, true);
+	if(ret != PCM514x_ERR_OK) {
+		debug(1, "Failed to set gpio pin inversion: %d", ret);
+		return ret;
+	}
+
+	return PCM514x_ERR_OK;
+}
+
+pcm514x_error_t pcm514x_gpio_set_mode(const pcm514x_t* dev, uint8_t gpio, pcm514x_gpio_t mode)
+{
+	return PCM514x_ERR_HWCFG_UNSUPPORTED;
+}
+
+pcm514x_error_t pcm514x_gpio_write(const pcm514x_t* dev, uint8_t gpio, bool output)
+{
+	int ret;
+
+	if(gpio > 5) {
+		debug(1, "Invalid gpio number %d given (max. 5).", gpio);
+		return PCM514x_ERR_OOB;
+	}
+	ret =  write_register(dev, PCM514x_GPIO_CONTROL_1, (1 << gpio), (output) ? 0xFF : 0x00, true);
+	if(ret != PCM514x_ERR_OK) {
+		debug(1, "Failed to set gpio pin state: %d", ret);
+		return ret;
+	}
+
+	return PCM514x_ERR_OK;
+}
+
+
+static int write_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t val, bool verify)
+{
+	uint8_t value, newval;
+	debug(3, "Register write at 0x%04x: val 0x%02x, mask 0x%02x.", reg, val, mask);
 
 	// change to the needed page
 	write(dev, PCM514x_PAGE_REG, PCM514x_PAGE(reg));
 
 	// read the current register value
-	value = read(dev, reg);
+	value = read(dev, reg & 0xFF);
 	// replace the masked parts
 	value = (val & mask) | (value & ~mask);
 	write(dev, reg & 0xFF, value);
 
-	// write failed
-	if (value != read(dev, reg)){
-		debug(1, "SPI write at 0x%02x failed, got 0x%02x (expected: 0x%02x)!", reg, value, val);
-		return PCM514x_ERR_IOERROR;
+	// read back the register to verify it
+	if(verify) {
+		// write failed
+		newval = read(dev, reg);
+		if (value != newval){
+			debug(1, "Register write at 0x%04x failed, got 0x%02x (expected: 0x%02x)!", reg, verify, value);
+			return PCM514x_ERR_IOERROR;
+		}
 	}
 	return PCM514x_ERR_OK;
 }
@@ -356,7 +415,7 @@ static int read_register(const pcm514x_t* dev, int reg, uint8_t mask, uint8_t sh
 
 static void write(const pcm514x_t* dev, uint8_t reg, uint8_t val)
 {
-	debug(3, "write: reg: 0x%02x val: 0x%02x", reg, val);
+	debug(4, "write: reg: 0x%02x val: 0x%02x", reg, val);
 
 	switch(dev->mode) {
 #if PCM514X_SPI_SUPPORT
@@ -403,7 +462,6 @@ static uint8_t read(const pcm514x_t* dev, uint8_t reg)
 {
 	uint8_t val = 0;
 
-	debug(3, "read: reg: 0x%02x val: 0x%02x", reg, val);
 	switch(dev->mode) {
 #if PCM514X_SPI_SUPPORT
 	case HWCFG_SPI:
@@ -446,6 +504,7 @@ static uint8_t read(const pcm514x_t* dev, uint8_t reg)
 		break;
 	}
 
+	debug(4, "read: reg: 0x%02x val: 0x%02x", reg, val);
 	return val;
 }
 
