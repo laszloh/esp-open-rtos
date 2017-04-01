@@ -41,8 +41,6 @@ static const pcm514x_t config = {
 	.clk.out_en = false
 };
 
-static uint8_t vol = 128;
-
 // Very simple WAV header, ignores most fields
 typedef struct __attribute__((packed)) {
     uint8_t ignore_0[22];
@@ -182,11 +180,7 @@ void play_task(void *pvParameters)
     i2s_dma_init(dma_isr_handler, clock_div, i2s_pins);
 
     while (1) {
-    	// step trough the volume in 10 dB steps
-    	vol += 20;
-    	pcm514x_set_volume(&config, vol);
-
-        init_descriptors_list();
+    	init_descriptors_list();
 
         i2s_dma_start(dma_block_list);
         lseek(fd, sizeof(dumb_wav_header_t), SEEK_SET);
@@ -211,7 +205,7 @@ void user_init(void)
     if(pcm514x_init(&config) == PCM514x_ERR_OK) {
     	pcm514x_set_standby(&config, false);
 		pcm514x_set_audio_dpath(&config, DPATH_RIGHT, DPATH_RIGHT);
-		pcm514x_set_volume(&config, vol);
+//		pcm514x_set_volume(&config, vol);
     }
 
     xTaskCreate(play_task, "test_task", 1024, NULL, 2, NULL);
