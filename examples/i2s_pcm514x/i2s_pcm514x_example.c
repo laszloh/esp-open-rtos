@@ -206,7 +206,7 @@ void user_init(void)
     if(pcm514x_init(&config) == PCM514x_ERR_OK) {
     	pcm514x_set_standby(&config, false);
 		pcm514x_set_audio_dpath(&config, DPATH_RIGHT, DPATH_RIGHT);
-//		pcm514x_set_volume(&config, vol);
+		pcm514x_set_volume(&config, 128);
     }
 
     xTaskCreate(play_task, "test_task", 1024, NULL, 2, NULL);

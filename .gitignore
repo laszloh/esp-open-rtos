@@ -11,5 +11,10 @@ local.mk
 local.h
 screenlog.*
 *.swp
+
 .settings/*
 *.exe
+doxygen
+*.b#*
+*.s#*
+*.lck

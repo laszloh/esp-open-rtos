@@ -156,7 +156,6 @@ pcm514x_error_t pcm514x_gpio_set_mode(const pcm514x_t* dev, uint8_t gpio, pcm514
 pcm514x_error_t pcm514x_gpio_write(const pcm514x_t* dev, uint8_t gpio, bool output);
 
 #ifdef __cplusplus
-extern "C"
 }
 #endif
 
