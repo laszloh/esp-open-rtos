@@ -38,7 +38,8 @@
 static const pcm514x_t config = {
 	.mode = HWCFG_SPI,
 	.cs = 0,
-	.clk.out_en = false
+	.clk.out_en = false,
+	.deemphasis = true
 };
 
 // Very simple WAV header, ignores most fields
