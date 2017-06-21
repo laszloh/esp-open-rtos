@@ -13,3 +13,4 @@ screenlog.*
 *.swp
 .settings/*
 *.exe
+private_ssid_config.h
