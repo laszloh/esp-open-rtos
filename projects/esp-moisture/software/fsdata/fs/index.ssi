@@ -7,23 +7,24 @@
 		<link rel="stylesheet" type="text/css" href="css/style.css">
 		<link rel="shortcut icon" href="img/favicon.png">
 		<title>HTTP Server</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+		
 	</head>
 	<body>
 		<ul class="navbar">
 			<li><a class="active" href="/">Home</a></li>
-			<li><a href="websockets">WebSockets</a></li>
-			<li><a href="about">About</a></li>
+			<li><a href="config">Configuration</a></li>
+			<li><a href="upgrade">Firmware upgrade</a></li>
+			<li><a href="about">Information</a></li>
 		</ul>
 
 		<div class="grid main">
-			<h1>ESP8266 HTTP Server</h1>
+			<h1>ESP8266 moisture sensor</h1>
 
-			<div class="alert alert-done">HTTP Server is up and running.</div>
+			<div class="alert alert-done">MQTT is connected and running.</div>
 
-			<p>This is an example HTTP server with CGI and SSI support. The switch below will allow you to test CGI handler and turn
-			the blue LED on or off.</p>
-
-			<div class="cover" align="center">
+			<div class="cover">
+				MQTT Connection:
 				<div class="onoffswitch">
 					<input type="checkbox" name="onoffswitch" class="onoffswitch-checkbox" id="led-switch" onclick="gpio();">
 					<label class="onoffswitch-label" for="led-switch">
@@ -48,17 +49,15 @@
 					<td id="ledState"><!--#led--></td>
 				</tr>
 			</table>
-
-			<h1>How it works</h1>
-			<p> Each time the server detects a tag of the form <code>&lt;!--#name--&gt;</code> in a .shtml, .ssi or .shtm file
-				where <code>name</code> appears as one of the tags supplied to <code>http_set_ssi_handler</code> in the <code>pcConfigSSITags</code> array,
-				an insert string is appended after the tag string in file and sent back to the client.</p>
-			<p>A CGI handler function is called each time the server is asked for a file
-				whose name was previously registered as a CGI function using a call to <code>http_set_cgi_handler</code>.
-				This function allows you to access the parameters provided along with the URI.</p>
 		</div>
 
 		<script>
+			$(function() {
+				// setTimeout() function will be fired after page is loaded
+				// it will wait for 5 sec. and then will fire
+				// $("#successMessage").hide() function
+			})
+		
 			window.onload = function () {
 				var ls = document.getElementById('ledState').innerHTML;
 				ls = ls.split(/-->/).pop().trim();
